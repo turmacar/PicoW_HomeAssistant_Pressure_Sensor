@@ -13,6 +13,7 @@ WiFiClient client;
 HADevice device;
 HAMqtt mqtt(client, device);
 HASwitch led("led");
+HASensor pressure("pressure");
 
 void HAIntegration::configure() {
 
@@ -29,12 +30,18 @@ void HAIntegration::configure() {
 
     //Device metadata:
 
-    device.setName("Pico W HA Starter");
-    device.setSoftwareVersion("0.1");
+    device.setName("Pico W Pressure Sensor");
+    device.setSoftwareVersion("0.2");
 
-    // handle switch state
+    // Configure LED switch
     led.onCommand(switchHandler);
-    led.setName("Board LED"); // optional
+    led.setName("Board LED");
+
+    // Configure pressure sensor
+    pressure.setName("Pressure");
+    pressure.setDeviceClass("pressure");
+    pressure.setUnitOfMeasurement("psi");
+    pressure.setIcon("mdi:gauge");
 
     Serial.print("Connecting to MQTT\n");
     
@@ -53,4 +60,41 @@ void HAIntegration::switchHandler(bool state, HASwitch* sender) {
 
 void HAIntegration::loop() {
     mqtt.loop();
+
+    // Publish pressure reading at fixed intervals
+    unsigned long now = millis();
+    if (now - lastPressurePublish >= PRESSURE_INTERVAL_MS) {
+        lastPressurePublish = now;
+        float psi = readPressurePsi();
+        
+        // Convert float to string for HASensor
+        char psi_str[16];
+        snprintf(psi_str, sizeof(psi_str), "%.2f", psi);
+        pressure.setValue(psi_str);
+        Serial.printf("Pressure: %.2f psi\n", psi);
+    }
+}
+
+float HAIntegration::readPressurePsi() {
+    // Read and average multiple ADC samples
+    uint32_t sum = 0;
+    for (int i = 0; i < PRESSURE_SAMPLES; i++) {
+        sum += analogRead(PRESSURE_PIN);
+    }
+    uint16_t rawAdc = sum / PRESSURE_SAMPLES;
+
+    // Convert ADC reading (0-4095 for 0-3.3V) to voltage
+    float adcVoltage = rawAdc * (3.3f / 4095.0f);
+
+    // Apply divider: actual sensor voltage = ADC voltage * divider ratio
+    float sensorVoltage = adcVoltage * PRESSURE_DIVIDER;
+
+    // Convert voltage to psi: linear relationship from 0.5V->0psi to 4.5V->200psi
+    float psi = (sensorVoltage - PRESSURE_MIN_V) * (PRESSURE_MAX_PSI / (PRESSURE_MAX_V - PRESSURE_MIN_V));
+
+    // Clamp to valid range [0, 200] psi
+    if (psi < 0.0f) psi = 0.0f;
+    if (psi > PRESSURE_MAX_PSI) psi = PRESSURE_MAX_PSI;
+
+    return psi;
 }
