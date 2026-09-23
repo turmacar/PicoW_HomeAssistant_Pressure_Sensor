@@ -45,11 +45,72 @@ Connect the pressure sensor to Pico W as shown in [project_context.local.md](pro
 
 | Sensor | → | Pico W Pin | Function |
 |---|---|---|---|
-| Red (IN+) | → | VBUS (pin 3) | 5 V power |
-| Black (GND) | → | GND (pin 4) | Ground |
-| Green (OUT) | → | GP0 via divider | ADC input (pin 5) |
+| Red (IN+) | → | VBUS (pin 40) | 5 V power |
+| Black (GND) | → | GND (pin 38) | Ground |
+| Green (OUT) | → | GP26/ADC0 via divider | ADC input (pin 31) |
 
-**Voltage divider:** Sensor OUT → 2kΩ → GP0 → 1kΩ → GND
+**Voltage divider:** Sensor OUT → 2kΩ → GP26/ADC0 → 1kΩ → AGND (pin 33)
+
+#### Breadboard Test Layout
+
+Insert the Pico W across the breadboard's center trench with its USB connector
+at the top. The required pins are on the Pico's right-hand edge:
+
+```text
++--------------------------------+
+| PICO W                         |
+| USB connector at top           |
+|                                |
+| Right edge:                    |
+| VBUS       pin 40 -- RED       |
+| VSYS       pin 39 -- unused    |
+| GND        pin 38 -- BLACK     |
+| AGND       pin 33 -- 1 kΩ end  |
+| GP26/ADC0  pin 31 -- junction  |
++--------------------------------+
+```
+
+Complete circuit:
+
+```text
+                         +---------------- VBUS, pin 40
+                         |
+                    RED  |
+                  +------+------+
+                  |  PRESSURE   |
+                  |   SENSOR    |
+                  +------+------+
+                    BLACK|GREEN
+                         |  |
+GND, pin 38 -------------+  |
+                            |
+                          [2 kΩ]
+                            |
+                            +------------- GP26/ADC0, pin 31
+                            |
+                          [1 kΩ]
+                            |
+AGND, pin 33 --------------+
+```
+
+With USB disconnected:
+
+1. Connect sensor **red** to the row containing **VBUS pin 40**.
+2. Connect sensor **black** to the row containing **GND pin 38**.
+3. Put sensor **green** into an unused row.
+4. Connect the **2 kΩ resistor** from the green-wire row to the **GP26 pin 31**
+   row.
+5. Connect the **1 kΩ resistor** from the GP26 row to the **AGND pin 33** row.
+6. Optionally connect a **100 nF capacitor** between the GP26 and AGND rows.
+
+```text
+GP26 row: [Pico pin 31] [2 kΩ end] [1 kΩ end] [optional capacitor]
+AGND row: [Pico pin 33] [1 kΩ end]              [optional capacitor]
+```
+
+Before connecting USB, verify that VBUS/sensor red is not connected directly
+to GP26. With no pressure applied, expect approximately **0.5 V from sensor
+green to GND** and **0.167 V from GP26 to AGND**.
 
 ### Firmware Build & Upload
 
@@ -99,7 +160,7 @@ Pressure: 0.47 psi
 ## Sensor & ADC Math
 
 **Sensor spec:** Linear 0–200 psi → 0.5–4.5 V output  
-**Pico W ADC:** 12-bit, 3.3 V reference (pins GP0–GP5)
+**Pico W ADC:** 12-bit, 3.3 V reference (exposed inputs GP26–GP28)
 
 **Challenge:** 4.5 V sensor output exceeds 3.3 V ADC max  
 **Solution:** Voltage divider (1/3 ratio) reduces peak voltage:
