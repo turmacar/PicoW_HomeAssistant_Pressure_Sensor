@@ -11,9 +11,14 @@
 //   Green (OUT) -> 2 kΩ -> GP26 (ADC0) -> 1 kΩ -> AGND (1/3 divider)
 #define PRESSURE_PIN        A0         // GP26 / ADC0, physical pin 31
 #define PRESSURE_DIVIDER    3.0f       // R1+R2 / R2 = (2k+1k)/1k
-#define PRESSURE_MIN_V      0.5f       // sensor output at 0 psi
-#define PRESSURE_MAX_V      4.5f       // sensor output at 200 psi
+#define PRESSURE_MIN_V      0.5f       // spec: sensor output at 0 psi
+#define PRESSURE_MAX_V      4.5f       // spec: sensor output at 200 psi
 #define PRESSURE_MAX_PSI    200.0f
+
+// Calibrated 0 psi output; override with -DPRESSURE_ZERO_V=... in platformio.ini
+#ifndef PRESSURE_ZERO_V
+#define PRESSURE_ZERO_V     PRESSURE_MIN_V
+#endif
 #define PRESSURE_SAMPLES    16         // ADC samples averaged per reading
 #define PRESSURE_INTERVAL_MS 5000UL    // publish cadence
 

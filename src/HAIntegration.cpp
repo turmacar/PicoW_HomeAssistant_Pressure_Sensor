@@ -21,6 +21,9 @@ void HAIntegration::configure() {
 
     pinMode(LED_PIN, OUTPUT);
     digitalWrite(LED_PIN, LOW);    
+
+    // arduino-pico defaults to 10-bit; the conversion assumes 0-4095
+    analogReadResolution(12);
     
     //Set device ID as MAC address
 
@@ -89,8 +92,9 @@ float HAIntegration::readPressurePsi() {
     // Apply divider: actual sensor voltage = ADC voltage * divider ratio
     float sensorVoltage = adcVoltage * PRESSURE_DIVIDER;
 
-    // Convert voltage to psi: linear relationship from 0.5V->0psi to 4.5V->200psi
-    float psi = (sensorVoltage - PRESSURE_MIN_V) * (PRESSURE_MAX_PSI / (PRESSURE_MAX_V - PRESSURE_MIN_V));
+    // Linear 0.5-4.5 V -> 0-200 psi, offset by the calibrated zero
+    float psi = (sensorVoltage - PRESSURE_ZERO_V) * (PRESSURE_MAX_PSI / (PRESSURE_MAX_V - PRESSURE_MIN_V));
+    Serial.printf("ADC raw=%u adcV=%.3f sensorV=%.3f unclamped=%.2f psi\n", rawAdc, adcVoltage, sensorVoltage, psi);
 
     // Clamp to valid range [0, 200] psi
     if (psi < 0.0f) psi = 0.0f;

@@ -41,7 +41,7 @@ This project is built on the [arduino-pico](https://github.com/earlephilhower/ar
 
 ### Hardware Wiring
 
-Connect the pressure sensor to Pico W as shown in [project_context.local.md](project_context.local.md):
+Connect the pressure sensor to Pico W as follows:
 
 | Sensor | → | Pico W Pin | Function |
 |---|---|---|---|
@@ -51,10 +51,7 @@ Connect the pressure sensor to Pico W as shown in [project_context.local.md](pro
 
 **Voltage divider:** Sensor OUT → 2kΩ → GP26/ADC0 → 1kΩ → AGND (pin 33)
 
-#### Breadboard Test Layout
-
-Insert the Pico W across the breadboard's center trench with its USB connector
-at the top. The required pins are on the Pico's right-hand edge:
+The required pins are on the Pico's right-hand edge:
 
 ```text
 +--------------------------------+
@@ -111,6 +108,51 @@ AGND row: [Pico pin 33] [1 kΩ end]              [optional capacitor]
 Before connecting USB, verify that VBUS/sensor red is not connected directly
 to GP26. With no pressure applied, expect approximately **0.5 V from sensor
 green to GND** and **0.167 V from GP26 to AGND**.
+
+
+### Breadboard layout
+A working layout on a standard breadboard (columns a–e | trench | f–j, with
++/− power rails). The Pico straddles the trench with its USB end at row 30,
+so its right-edge pins land in column **g**:
+
+| Hole | Connection |
+|---|---|
+| g30 | Pico VBUS (pin 40) |
+| g28 | Pico GND (pin 38) |
+| g23 | Pico AGND (pin 33) |
+| g21 | Pico GP26/ADC0 (pin 31) |
+| i30 → + rail | Jumper: VBUS to + rail |
+| i28 → − rail | Jumper: GND to − rail |
+| + rail / − rail | Sensor red / sensor black |
+| i2 | Sensor green |
+| h2 → e3 | Jumper: sensor green across the trench to row 3 |
+| d3 – d5 | 2 kΩ resistor |
+| b5 – b7 | 1 kΩ resistor |
+| e5 → i21 | Jumper: divider midpoint to GP26 |
+| a7 → i23 | Jumper: 1 kΩ bottom to AGND |
+
+```text
+         a    b    c    d    e  |  f    g    h    i    j
+row 2                           |            jmp  GRN        <- sensor green
+row 3                 2k   jmp  |                            <- from h2
+row 5         1k      2k   jmp  |                            -> i21 (GP26)
+row 7    jmp  1k                |                            -> i23 (AGND)
+  ...
+row 21                          |       GP26      jmp        <- from e5
+row 23                          |       AGND      jmp        <- from a7
+row 28                          |       GND       jmp        -> - rail
+row 30                          |       VBUS      jmp        -> + rail
+```
+
+Rows 3, 5 and 7 are the only nodes in the divider: row 3 = sensor out,
+row 5 = ADC input (sensor out / 3), row 7 = analog ground.
+
+On long breadboards the power rails are often split at the midpoint; keep the
+VBUS/GND jumpers and the sensor leads on the same rail segment.
+
+Measured on this build (no pressure, USB power): sensor green ≈ **0.491 V**,
+GP26 ≈ **0.164 V**. The firmware zero is calibrated to this (see
+[Calibration](#calibration)).
 
 ### Firmware Build & Upload
 
@@ -171,23 +213,28 @@ Pressure: 0.47 psi
 
 **Conversion pipeline:**
 ```c
+analogReadResolution(12)                           // arduino-pico defaults to 10-bit
 adcVoltage = analogRead(pin) * (3.3 / 4095.0)     // 0–3.3V
 sensorVoltage = adcVoltage * 3.0                   // Undo divider
-psi = (sensorVoltage - 0.5) * (200.0 / 4.0)       // Linear scale to 0–200
+psi = (sensorVoltage - ZERO_V) * (200.0 / 4.0)    // Linear scale to 0–200, ZERO_V defaults to 0.5
 psi = constrain(psi, 0.0, 200.0)                   // Clamp
 ```
 
-## Extending the Project
+### Calibration
 
-See [examples in `arduino-home-assistant`](https://github.com/dawidchyrzynski/arduino-home-assistant/tree/main/examples) for:
-- Additional analog sensors
-- Digital inputs (buttons, switches)
-- PWM outputs (fans, lights)
-- HVAC controls
+The firmware assumes the spec zero of **0.5 V = 0 psi** (`PRESSURE_ZERO_V`).
+Individual sensors and USB supplies vary slightly, so you can override it in
+`platformio.ini`:
 
-# Troubleshooting
+```ini
+build_flags =
+	-DPRESSURE_ZERO_V=0.49f
+```
 
-- To come
+To find your value, open the serial monitor with nothing connected to the
+sensor port and read `sensorV` from the `ADC raw=...` debug line. Remove the
+flag to go back to 0.5 V.
+
 
 # Appendix: Setting up a local Home Assistant installation with Mosquitto
 
@@ -211,4 +258,4 @@ PRs are welcome.
 
 ---
 
-Questions? Comments? Gripes? Open an [issue](https://github.com/daniloc/PicoW_HomeAssistant_Starter/issues/new/choose) if you think there will be general interest or impact on the project. Otherwise hit me up: [mail@danilocampos.com](mailto:mail@danilocampos.com).
+Questions? Comments? Gripes? Open an [issue](https://github.com/daniloc/PicoW_HomeAssistant_Starter/issues/new/choose) if you think there will be general interest or impact on the project.
